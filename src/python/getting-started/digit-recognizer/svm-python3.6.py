@@ -6,25 +6,29 @@ Created on 2017-10-26
 Update  on 2017-10-26
 Author: 片刻
 Github: https://github.com/apachecn/kaggle
-PCA主成成分分析
 '''
 
+import os
 import csv
 import time
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
+
+# 数据路径
+data_dir = '/opt/data/kaggle/getting-started/digit-recognizer/'
 
 
 # 加载数据
 def opencsv():
     print('Load Data...')
     # 使用 pandas 打开
-    dataTrain = pd.read_csv('datasets/getting-started/digit-recognizer/input/train.csv')
-    dataPre = pd.read_csv('datasets/getting-started/digit-recognizer/input/test.csv')
+    dataTrain = pd.read_csv(os.path.join(data_dir, 'input/train.csv'))
+    dataPre = pd.read_csv(os.path.join(data_dir, 'input/test.csv'))
     trainData = dataTrain.values[:, 1:]  # 读入全部训练数据
     trainLabel = dataTrain.values[:, 0]
     preData = dataPre.values[:, :]  # 测试全部测试个数据
@@ -60,9 +64,9 @@ def dRCsv(x_train, x_test, preData, COMPONENT_NUM):
 # 训练模型
 def trainModel(trainData, trainLabel):
     print('Train SVM...')
-    svmClf = SVC(C=4, kernel='rbf')
-    svmClf.fit(trainData, trainLabel)  # 训练SVM
-    return svmClf
+    clf = SVC(C=4, kernel='rbf')
+    clf.fit(trainData, trainLabel)  # 训练SVM
+    return clf
 
 
 # 结果输出保存
@@ -79,21 +83,21 @@ def saveResult(result, csvName):
 
 # 分析数据,看数据是否满足要求（通过这些来检测数据的相关性，考虑在分类的时候提取出重要的特征）
 def analyse_data(dataMat):
-    meanVals = np.mean(dataMat, axis=0) # np.mean 求出每列的平均值meanVals
-    meanRemoved = dataMat-meanVals # 每一列特征值减去该列的特征值均值
-    #计算协方差矩阵，除数n-1是为了得到协方差的 无偏估计
-    #cov(X,0) = cov(X) 除数是n-1(n为样本个数)
-    #cov(X,1) 除数是n
-    covMat = np.cov(meanRemoved, rowvar=0) # cov 计算协方差的值,
+    meanVals = np.mean(dataMat, axis=0)  # np.mean 求出每列的平均值meanVals
+    meanRemoved = dataMat-meanVals  # 每一列特征值减去该列的特征值均值
+    # 计算协方差矩阵，除数n-1是为了得到协方差的 无偏估计
+    # cov(X,0) = cov(X) 除数是n-1(n为样本个数)
+    # cov(X,1) 除数是n
+    covMat = np.cov(meanRemoved, rowvar=0)  # cov 计算协方差的值,
     # np.mat 是用来生成一个矩阵的
     # 保存特征值(eigvals)和对应的特征向量(eigVects)
-    eigvals, eigVects = np.linalg.eig(np.mat(covMat)) # linalg.eig 计算的值是矩阵的特征值，保存在对应的矩阵中
-    eigValInd = np.argsort(eigvals) #  argsort 对特征值进行排序，返回的是数值从小到大的索引值
+    eigvals, eigVects = np.linalg.eig(np.mat(covMat))  # linalg.eig 计算的值是矩阵的特征值，保存在对应的矩阵中
+    eigValInd = np.argsort(eigvals)  # argsort 对特征值进行排序，返回的是数值从小到大的索引值
 
-    topNfeat = 100 # 需要保留的特征维度，即要压缩成的维度数
+    topNfeat = 100  # 需要保留的特征维度，即要压缩成的维度数
 
     # 从排序后的矩阵最后一个开始自下而上选取最大的N个特征值，返回其对应的索引
-    eigValInd = eigValInd[:-(topNfeat+1):-1] 
+    eigValInd = eigValInd[:-(topNfeat+1):-1]
 
     # 计算特征值的总和
     cov_all_score = float(sum(eigvals))
@@ -131,11 +135,11 @@ def getOptimalAccuracy(trainData, trainLabel, preData):
     for i in range(30, 45, 1):
         # 评估训练结果
         pcaTrainData,  pcaTestData, pcaPreData = dRCsv(x_train, x_test, preData, i)
-        svmClf = trainModel(pcaTrainData, y_train)
-        svmtestLabel = svmClf.predict(pcaTestData)
+        clf = trainModel(pcaTrainData, y_train)
+        testLabel = clf.predict(pcaTestData)
 
         errArr = np.mat(np.ones((lineLen, 1)))
-        sumErrArr = errArr[svmtestLabel != y_test].sum()
+        sumErrArr = errArr[testLabel != y_test].sum()
         sumErr = sumErrArr/lineLen
 
         print('i=%s' % i, lineLen, sumErrArr, sumErr)
@@ -143,8 +147,8 @@ def getOptimalAccuracy(trainData, trainLabel, preData):
             minErr = sumErr
             minSumErr = sumErrArr
             optimalNum = i
-            optimalSVMClf = svmClf
-            optimalLabel = svmtestLabel
+            optimalSVMClf = clf
+            optimalLabel = testLabel
             pcaPreDataResult = pcaPreData
             print("i=%s >>>>> \t" % i, lineLen, int(minSumErr), 1-minErr)
 
@@ -156,7 +160,6 @@ def getOptimalAccuracy(trainData, trainLabel, preData):
         support 参与比较的数量
     参考链接：http://scikit-learn.org/stable/modules/generated/sklearn.metrics.classification_report.html#sklearn.metrics.classification_report
     '''
-
     # target_names 以 y的label分类为准
     # target_names = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
     target_names = [str(i) for i in list(set(y_test))]
@@ -188,8 +191,8 @@ def trainDRSVM():
     # 模型训练 (数据预处理-降维)
     optimalSVMClf, pcaPreData = getOptimalAccuracy(trainData, trainLabel, preData)
 
-    storeModel(optimalSVMClf, 'datasets/getting-started/digit-recognizer/ouput/Result_sklearn_SVM.model')
-    storeModel(pcaPreData, 'datasets/getting-started/digit-recognizer/ouput/Result_sklearn_SVM.pcaPreData')
+    storeModel(optimalSVMClf, os.path.join(data_dir, 'output/Result_sklearn_SVM.model'))
+    storeModel(pcaPreData, os.path.join(data_dir, 'output/Result_sklearn_SVM.pcaPreData'))
 
     print("finish!")
     stopTime = time.time()
@@ -199,25 +202,43 @@ def trainDRSVM():
 def preDRSVM():
     startTime = time.time()
     # 加载模型和数据
-    optimalSVMClf = getModel('datasets/getting-started/digit-recognizer/ouput/Result_sklearn_SVM.model')
-    pcaPreData = getModel('datasets/getting-started/digit-recognizer/ouput/Result_sklearn_SVM.pcaPreData')
+    optimalSVMClf = getModel(os.path.join(data_dir, 'output/Result_sklearn_SVM.model'))
+    pcaPreData = getModel(os.path.join(data_dir, 'output/Result_sklearn_SVM.pcaPreData'))
 
     # 结果预测
     testLabel = optimalSVMClf.predict(pcaPreData)
     # print("testLabel = %f" % testscore)
     # 结果的输出
-    saveResult(testLabel, 'datasets/getting-started/digit-recognizer/ouput/Result_sklearn_SVM.csv')
+    saveResult(testLabel, os.path.join(data_dir, 'output/Result_sklearn_SVM.csv'))
     print("finish!")
     stopTime = time.time()
     print('PreModel load time used:%f s' % (stopTime - startTime))
 
 
+# 数据可视化
+def dataVisulization(data, labels):
+    pca = PCA(n_components=2, whiten=True) # 使用PCA方法降到2维
+    pca.fit(data)
+    pcaData = pca.transform(data)
+    uniqueClasses = set(labels)
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    for cClass in uniqueClasses:
+        plt.scatter(pcaData[labels==cClass, 0], pcaData[labels==cClass, 1])
+    plt.xlabel('$x_1$')
+    plt.ylabel('$x_2$')
+    plt.title('MNIST visualization')
+    plt.show()
+
+
 if __name__ == '__main__':
     trainData, trainLabel, preData = opencsv()
+    dataVisulization(trainData, trainLabel)
+
     # 训练并保存模型
-    trainDRSVM()
+    # trainDRSVM()
 
     # 分析数据
-    analyse_data(trainData)
+    # analyse_data(trainData)
     # 加载预测数据集
     # preDRSVM()
